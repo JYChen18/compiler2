@@ -55,9 +55,10 @@ char* Vint2char(int input){
 }
 
 char* find_symbol(char* symbol){
-    if (symbol[0] == 'p')
+    if (symbol[0] == 'p'){
         symbol[0] = 'a';
         return symbol;
+    }
     string s = symbol; 
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_list[s];
@@ -226,7 +227,7 @@ Expression:
     | GOTO LABEL
     {
         FuncInit();
-        fprintf(yyout, "\tgoto %s\n", $2);
+        fprintf(yyout, "goto %s\n", $2);
     }
     | LABEL COL
     {
@@ -242,25 +243,25 @@ Expression:
     | CALL FUNC
     {
         FuncInit();
-        fprintf(yyout, "\tcall %s\n", $2);
+        fprintf(yyout, "call %s\n", $2);
     }
     | SYMBOL ASSIGN CALL FUNC
     {
         FuncInit();
-        fprintf(yyout, "\tcall %s\n", $4);
-        fprintf(yyout, "\tloadaddr %s t0\n", find_symbol($1));
-        fprintf(yyout, "\tt0[0] = a0\n");
+        fprintf(yyout, "call %s\n", $4);
+        fprintf(yyout, "loadaddr %s t0\n", find_symbol($1));
+        fprintf(yyout, "t0[0] = a0\n");
     }
     | RETURN RightValue
     {
         FuncInit();
-        fprintf(yyout, "\ta0 = %s\n", $2->str);
-        fprintf(yyout, "\treturn\n");
+        fprintf(yyout, "a0 = %s\n", $2->str);
+        fprintf(yyout, "return\n");
     }
     | RETURN
     {
         FuncInit();
-        fprintf(yyout, "\treturn\n");
+        fprintf(yyout, "return\n");
     }
 
 RightValue:
