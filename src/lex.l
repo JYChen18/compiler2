@@ -5,14 +5,14 @@
     #include"yacc.tab.hpp"
     void yyerror(const char*);
     int lineno = 1;
+
 %}
 
 integer     (-)?[0-9]+
 name_string [a-zA-Z_]([a-zA-Z_0-9])*
 func        f_{name_string}
 label       l{integer}
-var         v{integer}
-reg         (a[0-7]|s[0-9]|s10|s11|t[0-6]|x0)
+symbol      (T|t|p){integer}
 
 %%
 
@@ -23,10 +23,8 @@ reg         (a[0-7]|s[0-9]|s10|s11|t[0-6]|x0)
 "goto"        return GOTO;
 "return"      return RETURN;
 "call"        return CALL;
-"store"       return STORE;
-"load"        return LOAD;
-"loadaddr"    return LOADARRD;
-"malloc"      return MALLOC;
+"param"       return PARAM;
+"var"         return VAR;
 "end"         return END;
 "="           return ASSIGN;
 
@@ -47,10 +45,9 @@ reg         (a[0-7]|s[0-9]|s10|s11|t[0-6]|x0)
 
 
 {label}       {yylval.str=strdup(yytext); return LABEL;}
-{func}        {yylval.str=strdup(yytext+2); return FUNC;}
-{reg}         {yylval.str=strdup(yytext); return REG;}
-{var}         {yylval.str=strdup(yytext); return VAR;}
-{integer}     {yylval.num=atoi(yytext); return INT;}
+{func}        {yylval.str=strdup(yytext); return FUNC;}
+{symbol}      {yylval.str=strdup(yytext); return SYMBOL;}
+{integer}     {yylval.str=strdup(yytext); return INT;}
 [\n]	    { lineno++; return ENTER; }
 [ \t]+                 /* ignore whitespace */;
 "//"[^\n]*                 /* ignore comment */;

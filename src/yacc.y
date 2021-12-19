@@ -2,20 +2,80 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <iostream>
+#include <map>
+using std::map;
+
 extern FILE* yyin;
 extern FILE* yyout;
 extern int lineno;
 
 void yyerror(const char *str){
     fprintf(stderr,"Line %d : error %s\n", lineno, str);
-    //exit(1);
 }
-
 int yywrap(){
     return 1;
 }
 int yylex(void);
-int STK = 0;
+
+struct RightV{
+    char* str;
+    int kind; /* 0:symbol , 1:int */
+    RightV(char* a, int b){
+        str = a;
+        kind = b;
+    }
+};
+
+struct FuncSpace{
+    int v_num = 0;          /* variable num */
+    int param_num = 0;      /* param num */
+    int stack_start;        /* stack starting address/4 */
+    bool root;              /* global var is on heap?, local var is on stack */
+    FuncSpace* parent;
+    map <char*, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
+
+    FuncSpace (bool _root, int _start, FuncSpace* _p){
+        root = _root;
+        stack_start = _start;
+        parent = _p;
+    }
+};
+FuncSpace* global_space = new FuncSpace(1, 0, NULL);
+FuncSpace* curr_space = global_space;
+
+char* global_char;
+char* int2char(int input){
+    /* change int to char* */
+    sprintf(global_char,"%d",input);
+    return global_char;
+}
+char* Vint2char(int input){
+    sprintf(global_char,"v%d",input);
+    return global_char;
+}
+
+void find_symbol(char* symbol){
+    if (global_space->v_list.find(symbol) != global_space->v_list.end())
+        return global_space->v_list[symbol]
+    if (curr_space->v_list.find(symbol) != curr_space->v_list.end())
+        return curr_space->v_list[symbol]
+    printf("Undefined variable!\n");
+}
+
+void Symbol2Reg(char* s, int num){
+    fprintf(yyout, "loadaddr %s t%d\n", find_symbol(s), num);
+}
+
+void RightV2Reg(RightV v, int num){
+    if (v.kind == 0){
+        fprintf(yyout, "load %s t%d\n", v.str, num);
+    }
+    else{
+        fprintf(yyout, "t%d = %s\n", num, v.str);
+    }
+}
+
 %}
 
 %union {
@@ -23,279 +83,169 @@ int STK = 0;
     char* str;
 };
 
-%token<str> COL LBRK RBRK IF GOTO RETURN CALL STORE LOAD LOADARRD MALLOC END
-%token<str> OP LABEL FUNC REG VAR ENTER ASSIGN
-%token<num> INT
+%token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
+%token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
 
 %%
 
-Program : Program FUNCFunctionDef  {}
-        | Program GlobalVarDecl  {}
-        | Program ENTER {}
+Program : Program Declaration  
+        | Program Initialization  
+        | Program FunctionDef 
+        | Program ENTER 
         | {}
         ;
-GlobalVarDecl:
-    VAR ASSIGN INT ENTER
+Declaration:
+    VAR INT SYMBOL
     {
-        fprintf(yyout, "\t.global %s\n", $1);
-        fprintf(yyout, "\t.section .sdata\n");
-        fprintf(yyout, "\t.align 2\n");  
-        fprintf(yyout, "\t.type %s, @object\n", $1);      
-        fprintf(yyout, "\t.size %s, 4\n", $1);
-        fprintf(yyout, "%s:\n", $1);
-        fprintf(yyout, "\t.word %d\n", $3);
+        if (curr_space->root){
+	        fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2));
+            curr_space->v_list[$3] = Vint2char(curr_space->v_num);
+        }
+        else{
+            curr_space->v_list[$3] = int2char(curr_space->v_num + curr_space->stack_start);
+        }
+        curr_space->v_num += 1;
     }
-    | VAR ASSIGN MALLOC INT ENTER
+    | VAR SYMBOL
     {
-        fprintf(yyout, "\t.comm %s, %d, 4\n", $1, $4);
+        if (curr_space->root){
+	        fprintf(yyout, "v%d = 0\n", curr_space->v_num);
+            curr_space->v_list[$2] = Vint2char(curr_space->v_num);
+        }
+        else{
+            curr_space->v_list[$2] = int2char(curr_space->v_num + curr_space->stack_start);
+        }
+        curr_space->v_num += 1;
     }
     ;
 
-FUNCFunctionDef: 
-    FunctionHeader Expressions FunctionEnd {}
+Initialization:
+    SYMBOL ASSIGN INT{
+        fprintf(yyout, "%s = %d\n", find_symbol($1), $3);
+    }
+    | SYMBOL LBRK INT RBRK ASSIGN INT{
+        Symbol2Reg($1, 0);
+        fprintf(yyout, "t1 = %s\n", $3);
+        fprintf(yyout, "t0 = t0 + t1\n");
+        fprintf(yyout, "t0[0] = %s\n", $6);
+    }
+
+FunctionDef: 
+    FunctionHeader Statements FunctionEnd {}
+    ;
+
+Statements: 
+    Statements Statement
+    | Statements ENTER
+    | {}
     ;
 
 FunctionHeader: 
-    FUNC LBRK INT RBRK LBRK INT RBRK ENTER
+    FUNC LBRK INT RBRK
     {
-        STK = ($6 / 4 + 1) * 16;
-        fprintf(yyout, "\t.text\n");
-        fprintf(yyout, "\t.align 2\n");
-        fprintf(yyout, "\t.global %s\n", $1);
-        fprintf(yyout, "\t.type %s, @function\n", $1);      
-        fprintf(yyout, "%s:\n", $1);
-        fprintf(yyout, "\taddi sp, sp, %d\n", -STK);
-        fprintf(yyout, "\tsw ra, %d(sp)\n", STK-4);
+        if (curr_space->root)
+            FuncSpace * new_space = new FuncSpace(0, 0, curr_space);
+        else
+            FuncSpace * new_space = new FuncSpace(0, curr_space->v_num, curr_space);
+        curr_space = new_space;
+	    fprintf(yyout, "%s [%d] [%d]\n", $1, $3, 5); /* buggy? 5 is enough? */
     }
     ;
 
 FunctionEnd: 
-    END FUNC ENTER
+    END FUNC
     {
-	    fprintf(yyout, "\t.size %s, .-%s\n", $2, $2);
+        curr_space = curr_space->parent;
+	    fprintf(yyout, "end %s\n", $2);
     }
     ;
-    
-Expressions: 
-    Expressions Expression 
-    | Expressions ENTER
-    | { }
+
+Statement: 
+    Expression
+    | Declaration
     ;
 
 Expression: 
-    REG ASSIGN INT ENTER
+    SYMBOL ASSIGN RightValue OP RightValue
     {
-        fprintf(yyout, "\tli %s, %d\n", $1, $3);
+        Symbol2Reg($1, 0);
+        RightV2Reg($3, 1);
+        RightV2Reg($5, 2);
+        fprintf(yyout, "t3 = t1 %s t2\n", $4);
+        fprintf(yyout, "t0[0] = t3\n");
     }
-    | REG ASSIGN REG OP REG ENTER
+    | SYMBOL ASSIGN OP RightValue
     {
-        switch($4[0])
-        {
-            case '+':
-                fprintf(yyout, "\tadd %s, %s, %s\n", $1, $3, $5);
-                break;
-            case '-':
-                fprintf(yyout, "\tsub %s, %s, %s\n", $1, $3, $5);
-                break;  
-            case '*':
-                fprintf(yyout, "\tmul %s, %s, %s\n", $1, $3, $5);
-                break;  
-            case '/':
-                fprintf(yyout, "\tdiv %s, %s, %s\n", $1, $3, $5);
-                break;  
-            case '%':
-                fprintf(yyout, "\trem %s, %s, %s\n", $1, $3, $5);
-                break;  
-            case '<':
-                if (strcmp($4, "<=") == 0){
-                    fprintf(yyout, "\tsgt %s, %s, %s\n", $1, $3, $5);
-                    fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                }
-                else{
-                    fprintf(yyout, "\tslt %s, %s, %s\n", $1, $3, $5);
-                }
-                break;  
-            case '>':
-                if (strcmp($4, ">=") == 0){
-                    fprintf(yyout, "\tslt %s, %s, %s\n", $1, $3, $5);
-                    fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                }
-                else{
-                    fprintf(yyout, "\tsgt %s, %s, %s\n", $1, $3, $5);
-                }
-           
-                break;  
-            case '&':
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $3);
-                fprintf(yyout, "\tsnez s0, %s\n", $5);
-                fprintf(yyout, "\tand %s, %s, s0\n", $1, $1);
-                break;  
-            case '|':
-                fprintf(yyout, "\tor %s, %s, %s\n", $1, $3, $5);
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $1);
-                break;  
-            case '!':
-                fprintf(yyout, "\txor %s, %s, %s\n", $1, $3, $5);
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $1);
-                break;  
-            case '=':
-                fprintf(yyout, "\txor %s, %s, %s\n", $1, $3, $5);
-                fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                break;  
-            default:
-			    break;
-        }
+        Symbol2Reg($1, 0);
+        RightV2Reg($4, 1);
+        fprintf(yyout, "t2 = %s t1\n", $3);
+        fprintf(yyout, "t0[0] = t2\n");
     }
-    | REG ASSIGN REG OP INT ENTER
-    {   
-        
-        switch($4[0])
-        {
-            case '+':
-                fprintf(yyout, "\taddi %s, %s, %d\n", $1, $3, $5);
-                break;
-            case '<':
-                if (strcmp($4, "<=") == 0){
-                    fprintf(yyout, "\tli s0, %d\n", $5);
-                    fprintf(yyout, "\tsgt %s, %s, s0\n", $1, $3);
-                    fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                }
-                else{
-                    fprintf(yyout, "\tslti %s, %s, %d\n", $1, $3, $5);
-                }
-                break; 
-                 
-            case '-':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\tsub %s, %s, s0\n", $1, $3);
-                break;  
-            case '*':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\tmul %s, %s, s0\n", $1, $3);
-                break;  
-            case '/':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\tdiv %s, %s, s0\n", $1, $3);
-                break;  
-            case '%':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\trem %s, %s, s0\n", $1, $3);
-                break;  
-            case '>':
-                if (strcmp($4, ">=") == 0){
-                    fprintf(yyout, "\tli s0, %d\n", $5);
-                    fprintf(yyout, "\tslt %s, %s, s0\n", $1, $3);
-                    fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                }
-                else{
-                    fprintf(yyout, "\tli s0, %d\n", $5);
-                    fprintf(yyout, "\tsgt %s, %s, s0\n", $1, $3);
-                }
-                break;  
-            case '&':
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $3);
-                fprintf(yyout, "\tsnez s0, s0\n");
-                fprintf(yyout, "\tand %s, %s, s0\n", $1, $1);
-                break;  
-            case '|':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\tor %s, %s, s0\n", $1, $3);
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $1);
-                break;  
-            case '!':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\txor %s, %s, s0\n", $1, $3);
-                fprintf(yyout, "\tsnez %s, %s\n", $1, $1);
-                break;  
-            case '=':
-                fprintf(yyout, "\tli s0, %d\n", $5);
-                fprintf(yyout, "\txor %s, %s, s0\n", $1, $3);
-                fprintf(yyout, "\tseqz %s, %s\n", $1, $1);
-                break; 
-            default:
-                break; 
-        }
-    }
-    | REG ASSIGN OP REG ENTER
+    | SYMBOL ASSIGN RightValue 
     {
-        switch($3[0])
-        {
-            case '-':
-                fprintf(yyout, "\tneg %s, %s\n", $1, $4);
-                break;  
-            case '!':
-                fprintf(yyout, "\tseqz %s, %s\n", $1, $4);
-                break;  
-            default:
-                break;
-        }
+        Symbol2Reg($1, 0);
+        RightV2Reg($3, 1);
+        fprintf(yyout, "t0[0] = t1\n");
     }
-    | REG ASSIGN REG ENTER
+    | SYMBOL LBRK RightValue RBRK ASSIGN RightValue
     {
-        fprintf(yyout, "\tmv %s, %s\n", $1, $3);
+        Symbol2Reg($1, 0);
+        RightV2Reg($3, 1);
+        RightV2Reg($6, 2);
+        fprintf(yyout, "t0 = t0 + t1\n");
+        fprintf(yyout, "t0[0] = t2\n");
     }
-    | REG LBRK INT RBRK ASSIGN REG ENTER
+    | SYMBOL ASSIGN SYMBOL LBRK RightValue RBRK
     {
-        fprintf(yyout, "\tsw %s, %d(%s)\n", $6, $3, $1);
+        Symbol2Reg($1, 0);
+        Symbol2Reg($3, 1);
+        RightV2Reg($5, 2);
+        fprintf(yyout, "t1 = t1 + t2\n");
+        fprintf(yyout, "t3 = t1[0]\n");
+        fprintf(yyout, "t0[0] = t3\n");
+
     }
-    | REG ASSIGN REG LBRK INT RBRK ENTER
+    | IF RightValue OP RightValue GOTO LABEL
     {
-        fprintf(yyout, "\tlw %s, %d(%s)\n", $1, $5, $3);
+        RightV2Reg($2, 0);
+        RightV2Reg($4, 1);
+        fprintf(yyout, "if t0 %s t1 goto %s\n", $3, $6);
     }
-    | IF REG OP REG GOTO LABEL ENTER
+    | GOTO LABEL
     {
-        if (strcmp($3, "<")==0){
-                fprintf(yyout, "\tblt %s, %s, .%s\n", $2, $4, $6);}
-        else if (strcmp($3, ">")==0){
-                fprintf(yyout, "\tbgt %s, %s, .%s\n", $2, $4, $6);}
-        else if (strcmp($3, "<=")==0){
-                fprintf(yyout, "\tble %s, %s, .%s\n", $2, $4, $6);}
-        else if (strcmp($3, ">=")==0){
-                fprintf(yyout, "\tbge %s, %s, .%s\n", $2, $4, $6);}
-        else if (strcmp($3, "!=")==0){
-                fprintf(yyout, "\tbne %s, %s, .%s\n", $2, $4, $6); } 
-        else if (strcmp($3, "==")==0){
-                fprintf(yyout, "\tbeq %s, %s, .%s\n", $2, $4, $6);}
-    } 
-    | GOTO LABEL ENTER
-    {
-        fprintf(yyout, "\tj .%s\n", $2);
+        fprintf(yyout, "\tgoto %s\n", $2);
     }
-    | LABEL COL ENTER
+    | LABEL COL
     {
-        fprintf(yyout, ".%s:\n", $1);
+        fprintf(yyout, "%s:\n", $1);
     }
-    | CALL FUNC ENTER
+    | PARAM RightValue
+    {
+        fprintf(yyout, "a%d = %s\n", curr_space->param_num, $2);
+        curr_space->param_num += 1;
+    }
+    | CALL FUNC
     {
         fprintf(yyout, "\tcall %s\n", $2);
     }
-    | RETURN ENTER
+    | SYMBOL ASSIGN CALL FUNC
     {
-        fprintf(yyout, "\tlw ra, %d(sp)\n", STK-4);
-        fprintf(yyout, "\taddi sp, sp, %d\n", STK);
-        fprintf(yyout, "\tret\n");
+        fprintf(yyout, "\tcall %s\n", $4);
+        fprintf(yyout, "\tloadaddr %s t0\n", find_symbol($1));
+        fprintf(yyout, "\tt0[0] = a0\n");
+    }
+    | RETURN RightValue
+    {
+        fprintf(yyout, "\ta0 = %s\n", $2);
+        fprintf(yyout, "\treturn\n");
+    }
+    | RETURN
+    {
+        fprintf(yyout, "\treturn\n");
+    }
 
-    }
-    | STORE REG INT ENTER
-    {
-        fprintf(yyout, "\tsw %s, %d(sp)\n", $2, $3*4);
-    }
-    | LOAD INT REG ENTER
-    {
-        fprintf(yyout, "\tlw %s, %d(sp)\n", $3, $2*4);
-    }
-    | LOAD VAR REG ENTER
-    {
-        fprintf(yyout, "\tlui %s, %%hi(%s)\n", $3, $2);
-        fprintf(yyout, "\tlw %s, %%lo(%s)(%s)\n", $3, $2, $3);
-    }
-    | LOADARRD INT REG ENTER
-    {
-        fprintf(yyout, "\taddi %s, sp, %d\n", $3, $2*4);
-    }
-    | LOADARRD VAR REG ENTER
-    {
-        fprintf(yyout, "\tla %s, %s\n", $3, $2);
-    }
+RightValue: 
+    SYMBOL {$$=RightV(find_symbol($1), 0);}
+    | INT  {$$=RightV($1, 1);}
     ;
 %%
