@@ -253,7 +253,7 @@ Expression:
     {
         FuncInit();
         fprintf(yyout, "call %s\n", $4);
-        Symbol2Reg($1, 0)
+        Symbol2Reg($1, 0);
         fprintf(yyout, "t0[0] = a0\n");
     }
     | RETURN RightValue
