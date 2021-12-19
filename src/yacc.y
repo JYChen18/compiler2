@@ -85,7 +85,7 @@ void RightV2Reg(RightV* v, int num){
 
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
 %token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
-
+%type<v> RightValue
 %%
 
 Program : Program Declaration  
