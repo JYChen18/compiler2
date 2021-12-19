@@ -2,8 +2,9 @@
 #include<string.h>
 #include<stdio.h>
 #include<stdlib.h>
+#include "head.hpp"
 #include"yacc.tab.hpp"
-#include"head.hpp"
+
 
 void yyerror(const char*);
 int lineno = 1;
@@ -52,7 +53,7 @@ symbol      (T|t|p){integer}
 {integer}     {yylval.str=strdup(yytext); return INT;}
 [\n]	    { lineno++; return ENTER; }
 [ \t]+                 /* ignore whitespace */;
-"//"[^\n]*                 /* ignore comment */;
+"//"[^\n]*            /* ignore comment */;
 . {}
 %%
 
@@ -63,9 +64,11 @@ int yywrap()
 
 int main(int argc, char** argv)
 {
-    if((yyin=fopen(argv[2],"r"))==NULL)
-            exit(1);
-    yyout=fopen(argv[4],"w");
+    if((yyin=fopen(argv[3],"r"))==NULL){
+        printf("wrong with infile");
+        exit(1);
+    }
+    yyout=fopen(argv[5],"w");
     yyparse();
     fclose(yyin);
     fclose(yyout);

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <map>
 #include "head.hpp"
-
+using std::string;
 using std::map;
 
 extern FILE* yyin;
@@ -26,10 +26,15 @@ struct FuncSpace{
     int stack_start;        /* stack starting address/4 */
     bool root;              /* global var is on heap?, local var is on stack */
     FuncSpace* parent;
-    map <char*, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
+    char* init1;
+    char* init2;
+    bool init_flag;
+    map <string, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
 
     FuncSpace (bool _root, int _start, FuncSpace* _p){
         root = _root;
+        if (root) init_flag = 1; 
+        else init_flag = 0;
         stack_start = _start;
         parent = _p;
     }
@@ -37,22 +42,24 @@ struct FuncSpace{
 FuncSpace* global_space = new FuncSpace(1, 0, NULL);
 FuncSpace* curr_space = global_space;
 
-char* global_char;
 char* int2char(int input){
     /* change int to char* */
-    sprintf(global_char,"%d",input);
-    return global_char;
+    char* newchar = new char[10];
+    sprintf(newchar,"%d",input);
+    return newchar;
 }
 char* Vint2char(int input){
-    sprintf(global_char,"v%d",input);
-    return global_char;
+    char* newchar = new char[10];
+    sprintf(newchar,"v%d",input);
+    return newchar;
 }
 
 char* find_symbol(char* symbol){
-    if (global_space->v_list.find(symbol) != global_space->v_list.end())
-        return global_space->v_list[symbol];
-    if (curr_space->v_list.find(symbol) != curr_space->v_list.end())
-        return curr_space->v_list[symbol];
+    string s = symbol; 
+    if (global_space->v_list.find(s) != global_space->v_list.end())
+        return global_space->v_list[s];
+    if (curr_space->v_list.find(s) != curr_space->v_list.end())
+        return curr_space->v_list[s];
     printf("Undefined variable!\n");
     return NULL;
 }
@@ -70,23 +77,30 @@ void RightV2Reg(RightV* v, int num){
     }
 }
 
+void FuncInit(){
+    if (curr_space->init_flag == 0){
+        fprintf(yyout, "%s [%s] [%d]\n", curr_space->init1, curr_space->init2, curr_space->v_num);
+        curr_space->init_flag = 1;
+    }
+}
+
 %}
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
 %token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
 %type<v> RightValue
 %%
 
-Program : Program Declaration
-        | Program Initialization
-        | Program FunctionDef
-        | Program ENTER
+Program : Program Declaration 
+        | Program Initialization 
+        | Program FunctionDef 
+        | Program ENTER 
         | {}
         ;
 Declaration:
     VAR INT SYMBOL
     {
         if (curr_space->root){
-                fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2);
+            fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2);
             curr_space->v_list[$3] = Vint2char(curr_space->v_num);
         }
         else{
@@ -134,9 +148,10 @@ FunctionHeader:
         if (curr_space->root)
             new_space = new FuncSpace(0, 0, curr_space);
         else
-            new_space = new FuncSpace(0, curr_space->v_num, curr_space);
+            new_space = new FuncSpace(0, curr_space->stack_start + curr_space->v_num, curr_space);
         curr_space = new_space;
-            fprintf(yyout, "%s [%s] [%d]\n", $1, $3, 5); /* buggy? 5 is enough? */
+        curr_space->init1 = $1;
+        curr_space->init2 = $3;
     }
     ;
 
@@ -150,7 +165,7 @@ FunctionEnd:
 
 Statement:
     Expression
-    | Declaration
+    | Declaration 
     ;
 
 Expression:
