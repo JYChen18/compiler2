@@ -67,19 +67,19 @@ void Symbol2Reg(char* s, int num){
     fprintf(yyout, "loadaddr %s t%d\n", find_symbol(s), num);
 }
 
-void RightV2Reg(RightV v, int num){
-    if (v.kind == 0){
-        fprintf(yyout, "load %s t%d\n", v.str, num);
+void RightV2Reg(RightV* v, int num){
+    if (v->kind == 0){
+        fprintf(yyout, "load %s t%d\n", v->str, num);
     }
     else{
-        fprintf(yyout, "t%d = %s\n", num, v.str);
+        fprintf(yyout, "t%d = %s\n", num, v->str);
     }
 }
 
 %}
 
 %union {
-    int num;
+    RightV* v;
     char* str;
 };
 
@@ -245,7 +245,7 @@ Expression:
     }
 
 RightValue: 
-    SYMBOL {$$=RightV(find_symbol($1), 0);}
-    | INT  {$$=RightV($1, 1);}
+    SYMBOL {$$ = new RightV(find_symbol($1), 0);}
+    | INT  {$$ = new RightV($1, 1);}
     ;
 %%
