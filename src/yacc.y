@@ -72,7 +72,7 @@ void Symbol2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
     if (s[0] == 'a')
         fprintf(yyout, "t%d = %s\n", num, s);
-    else:
+    else
         fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
 
