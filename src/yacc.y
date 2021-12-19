@@ -55,6 +55,9 @@ char* Vint2char(int input){
 }
 
 char* find_symbol(char* symbol){
+    if (symbol[0] == 'p')
+        symbol[0] = 'a';
+        return symbol;
     string s = symbol; 
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_list[s];
@@ -181,7 +184,6 @@ Expression:
     | SYMBOL ASSIGN OP RightValue
     {
         FuncInit();
-
         Symbol2Reg($1, 0);
         RightV2Reg($4, 1);
         fprintf(yyout, "t2 = %s t1\n", $3);
@@ -190,7 +192,6 @@ Expression:
     | SYMBOL ASSIGN RightValue
     {
         FuncInit();
-
         Symbol2Reg($1, 0);
         RightV2Reg($3, 1);
         fprintf(yyout, "t0[0] = t1\n");
@@ -198,7 +199,6 @@ Expression:
     | SYMBOL LBRK RightValue RBRK ASSIGN RightValue
     {
         FuncInit();
-
         Symbol2Reg($1, 0);
         RightV2Reg($3, 1);
         RightV2Reg($6, 2);
@@ -208,7 +208,6 @@ Expression:
     | SYMBOL ASSIGN SYMBOL LBRK RightValue RBRK
     {
         FuncInit();
-
         Symbol2Reg($1, 0);
         Symbol2Reg($3, 1);
         RightV2Reg($5, 2);
@@ -220,7 +219,6 @@ Expression:
     | IF RightValue OP RightValue GOTO LABEL
     {
         FuncInit();
-
         RightV2Reg($2, 0);
         RightV2Reg($4, 1);
         fprintf(yyout, "if t0 %s t1 goto %s\n", $3, $6);
@@ -228,32 +226,27 @@ Expression:
     | GOTO LABEL
     {
         FuncInit();
-
         fprintf(yyout, "\tgoto %s\n", $2);
     }
     | LABEL COL
     {
         FuncInit();
-
         fprintf(yyout, "%s:\n", $1);
     }
     | PARAM RightValue
     {
         FuncInit();
-
         fprintf(yyout, "a%d = %s\n", curr_space->param_num, $2->str);
         curr_space->param_num += 1;
     }
     | CALL FUNC
     {
         FuncInit();
-
         fprintf(yyout, "\tcall %s\n", $2);
     }
     | SYMBOL ASSIGN CALL FUNC
     {
         FuncInit();
-
         fprintf(yyout, "\tcall %s\n", $4);
         fprintf(yyout, "\tloadaddr %s t0\n", find_symbol($1));
         fprintf(yyout, "\tt0[0] = a0\n");
@@ -261,14 +254,12 @@ Expression:
     | RETURN RightValue
     {
         FuncInit();
-
         fprintf(yyout, "\ta0 = %s\n", $2->str);
         fprintf(yyout, "\treturn\n");
     }
     | RETURN
     {
         FuncInit();
-
         fprintf(yyout, "\treturn\n");
     }
 
