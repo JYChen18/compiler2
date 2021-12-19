@@ -55,12 +55,13 @@ char* Vint2char(int input){
     return global_char;
 }
 
-void find_symbol(char* symbol){
+char* find_symbol(char* symbol){
     if (global_space->v_list.find(symbol) != global_space->v_list.end())
-        return global_space->v_list[symbol]
+        return global_space->v_list[symbol];
     if (curr_space->v_list.find(symbol) != curr_space->v_list.end())
-        return curr_space->v_list[symbol]
+        return curr_space->v_list[symbol];
     printf("Undefined variable!\n");
+    return NULL;
 }
 
 void Symbol2Reg(char* s, int num){
@@ -79,27 +80,26 @@ void RightV2Reg(RightV* v, int num){
 struct Type{
     char* str;
     RightV* v;
-}
+};
 #define YYSTYPE Type
 
 %}
-
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
 %token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
 %type<v> RightValue
 %%
 
-Program : Program Declaration  
-        | Program Initialization  
-        | Program FunctionDef 
-        | Program ENTER 
+Program : Program Declaration
+        | Program Initialization
+        | Program FunctionDef
+        | Program ENTER
         | {}
         ;
 Declaration:
     VAR INT SYMBOL
     {
         if (curr_space->root){
-	        fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2));
+                fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2);
             curr_space->v_list[$3] = Vint2char(curr_space->v_num);
         }
         else{
@@ -110,7 +110,7 @@ Declaration:
     | VAR SYMBOL
     {
         if (curr_space->root){
-	        fprintf(yyout, "v%d = 0\n", curr_space->v_num);
+                fprintf(yyout, "v%d = 0\n", curr_space->v_num);
             curr_space->v_list[$2] = Vint2char(curr_space->v_num);
         }
         else{
@@ -119,10 +119,9 @@ Declaration:
         curr_space->v_num += 1;
     }
     ;
-
 Initialization:
     SYMBOL ASSIGN INT{
-        fprintf(yyout, "%s = %d\n", find_symbol($1), $3);
+        fprintf(yyout, "%s = %s\n", find_symbol($1), $3);
     }
     | SYMBOL LBRK INT RBRK ASSIGN INT{
         Symbol2Reg($1, 0);
@@ -131,42 +130,43 @@ Initialization:
         fprintf(yyout, "t0[0] = %s\n", $6);
     }
 
-FunctionDef: 
+FunctionDef:
     FunctionHeader Statements FunctionEnd {}
     ;
 
-Statements: 
+Statements:
     Statements Statement
     | Statements ENTER
     | {}
     ;
 
-FunctionHeader: 
+FunctionHeader:
     FUNC LBRK INT RBRK
     {
+        FuncSpace * new_space;
         if (curr_space->root)
-            FuncSpace * new_space = new FuncSpace(0, 0, curr_space);
+            new_space = new FuncSpace(0, 0, curr_space);
         else
-            FuncSpace * new_space = new FuncSpace(0, curr_space->v_num, curr_space);
+            new_space = new FuncSpace(0, curr_space->v_num, curr_space);
         curr_space = new_space;
-	    fprintf(yyout, "%s [%d] [%d]\n", $1, $3, 5); /* buggy? 5 is enough? */
+            fprintf(yyout, "%s [%s] [%d]\n", $1, $3, 5); /* buggy? 5 is enough? */
     }
     ;
 
-FunctionEnd: 
+FunctionEnd:
     END FUNC
     {
         curr_space = curr_space->parent;
-	    fprintf(yyout, "end %s\n", $2);
+            fprintf(yyout, "end %s\n", $2);
     }
     ;
 
-Statement: 
+Statement:
     Expression
     | Declaration
     ;
 
-Expression: 
+Expression:
     SYMBOL ASSIGN RightValue OP RightValue
     {
         Symbol2Reg($1, 0);
@@ -182,7 +182,7 @@ Expression:
         fprintf(yyout, "t2 = %s t1\n", $3);
         fprintf(yyout, "t0[0] = t2\n");
     }
-    | SYMBOL ASSIGN RightValue 
+    | SYMBOL ASSIGN RightValue
     {
         Symbol2Reg($1, 0);
         RightV2Reg($3, 1);
@@ -222,7 +222,7 @@ Expression:
     }
     | PARAM RightValue
     {
-        fprintf(yyout, "a%d = %s\n", curr_space->param_num, $2);
+        fprintf(yyout, "a%d = %s\n", curr_space->param_num, $2->str);
         curr_space->param_num += 1;
     }
     | CALL FUNC
@@ -237,7 +237,7 @@ Expression:
     }
     | RETURN RightValue
     {
-        fprintf(yyout, "\ta0 = %s\n", $2);
+        fprintf(yyout, "\ta0 = %s\n", $2->str);
         fprintf(yyout, "\treturn\n");
     }
     | RETURN
@@ -245,7 +245,7 @@ Expression:
         fprintf(yyout, "\treturn\n");
     }
 
-RightValue: 
+RightValue:
     SYMBOL {$$ = new RightV(find_symbol($1), 0);}
     | INT  {$$ = new RightV($1, 1);}
     ;
