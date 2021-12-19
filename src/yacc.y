@@ -4,6 +4,8 @@
 #include <string.h>
 #include <iostream>
 #include <map>
+#include "head.hpp"
+
 using std::map;
 
 extern FILE* yyin;
@@ -17,15 +19,6 @@ int yywrap(){
     return 1;
 }
 int yylex(void);
-
-struct RightV{
-    char* str;
-    int kind; /* 0:symbol , 1:int */
-    RightV(char* a, int b){
-        str = a;
-        kind = b;
-    }
-};
 
 struct FuncSpace{
     int v_num = 0;          /* variable num */
@@ -76,12 +69,6 @@ void RightV2Reg(RightV* v, int num){
         fprintf(yyout, "t%d = %s\n", num, v->str);
     }
 }
-
-struct Type{
-    char* str;
-    RightV* v;
-};
-#define YYSTYPE Type
 
 %}
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END

@@ -1,11 +1,12 @@
 %{
-    #include<string.h>
-    #include<stdio.h>
-    #include<stdlib.h>
-    #include"yacc.tab.hpp"
-    #include"yacc.tab.cpp"
-    void yyerror(const char*);
-    int lineno = 1;
+#include<string.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include"yacc.tab.hpp"
+#include"head.hpp"
+
+void yyerror(const char*);
+int lineno = 1;
 
 %}
 
