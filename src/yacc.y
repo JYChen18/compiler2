@@ -76,12 +76,13 @@ void RightV2Reg(RightV* v, int num){
     }
 }
 
-%}
-
-%union {
-    RightV* v;
+struct Type{
     char* str;
-};
+    RightV* v;
+}
+#define YYSTYPE Type
+
+%}
 
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
 %token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
