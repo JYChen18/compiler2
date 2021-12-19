@@ -253,7 +253,7 @@ Expression:
     {
         FuncInit();
         fprintf(yyout, "call %s\n", $4);
-        fprintf(yyout, "loadaddr %s t0\n", find_symbol($1));
+        Symbol2Reg($1, 0)
         fprintf(yyout, "t0[0] = a0\n");
     }
     | RETURN RightValue
