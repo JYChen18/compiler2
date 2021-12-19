@@ -128,7 +128,8 @@ Declaration:
     ;
 Initialization:
     SYMBOL ASSIGN INT{
-        fprintf(yyout, "%s = %s\n", find_symbol($1), $3);
+        Symbol2Reg($1, 0);
+        fprintf(yyout, "t0[0] = %s\n", $3);
     }
     | SYMBOL LBRK INT RBRK ASSIGN INT{
         Symbol2Reg($1, 0);
@@ -239,7 +240,8 @@ Expression:
     | PARAM RightValue
     {
         FuncInit();
-        fprintf(yyout, "a%d = %s\n", curr_space->param_num, $2->str);
+        RightV2Reg($2, 0);
+        fprintf(yyout, "a%d = t0\n", curr_space->param_num);
         curr_space->param_num += 1;
     }
     | CALL FUNC
@@ -257,7 +259,8 @@ Expression:
     | RETURN RightValue
     {
         FuncInit();
-        fprintf(yyout, "a0 = %s\n", $2->str);
+        RightV2Reg($2, 0);
+        fprintf(yyout, "a0 = t0\n");
         fprintf(yyout, "return\n");
     }
     | RETURN
