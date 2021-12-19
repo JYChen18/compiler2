@@ -77,13 +77,13 @@ void RightV2Reg(RightV* v, int num){
     }
 }
 
+struct Type{
+    char* str;
+    RightV* v;
+};
+#define YYSTYPE Type
 
 %}
-%union{
-    RightV* v;
-    char* str;
-}
-
 %token<str> COL LBRK RBRK IF GOTO RETURN CALL PARAM END
 %token<str> OP LABEL FUNC VAR ENTER ASSIGN SYMBOL INT
 %type<v> RightValue
@@ -110,7 +110,7 @@ Declaration:
     | VAR SYMBOL
     {
         if (curr_space->root){
-                fprintf(yyout, "v%d = 0\n", curr_space->v_num);
+            fprintf(yyout, "v%d = 0\n", curr_space->v_num);
             curr_space->v_list[$2] = Vint2char(curr_space->v_num);
         }
         else{
