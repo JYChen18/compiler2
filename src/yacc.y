@@ -68,17 +68,19 @@ char* find_symbol(char* symbol){
     return NULL;
 }
 
-void Symbol2Reg(char* s, int num){
-    fprintf(yyout, "loadaddr %s t%d\n", find_symbol(s), num);
+void Symbol2Reg(char* symbol, int num){
+    char* s = find_symbol(symbol);
+    if (s[0] == 'a')
+        fprintf(yyout, "t%d = %s\n", num, s);
+    else:
+        fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
 
 void RightV2Reg(RightV* v, int num){
-    if (v->kind == 0){
+    if (v->kind == 0 and v->str[0] != 'a')
         fprintf(yyout, "load %s t%d\n", v->str, num);
-    }
-    else{
+    else
         fprintf(yyout, "t%d = %s\n", num, v->str);
-    }
 }
 
 void FuncInit(){
