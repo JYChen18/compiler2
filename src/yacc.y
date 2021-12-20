@@ -83,7 +83,7 @@ char* find_symbol(char* symbol){
         return curr_space->v_list[s];
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_list[s];
-    printf("Undefined variable!\n");
+    printf("Undefined variable: %s\n", symbol);
     return symbol;
 }
 
