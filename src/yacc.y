@@ -23,7 +23,6 @@ int yylex(void);
 struct FuncSpace{
     int v_num = 0;          /* variable num */
     int param_num = 0;      /* param num for next function */
-    int stack_start;        /* stack starting address/4 */
     bool root;              /* global or local. local var is all on stack */
     FuncSpace* parent;
     char* init1;            /* func name */
@@ -31,13 +30,12 @@ struct FuncSpace{
     bool init_flag;         /* need to init after 'var...'! */
     map <string, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
     map <string, int> v_arr_f;   /* Eeyore_name -> 1 if is array else 0 */
-    FuncSpace (bool _root, int _start, FuncSpace* _p){
+    FuncSpace (bool _root, FuncSpace* _p){
         root = _root;
         if (root) 
             init_flag = 1; 
         else 
             init_flag = 0;
-        stack_start = _start;
         parent = _p;
     }
 };
@@ -148,7 +146,7 @@ Declaration:
             curr_space->v_arr_f[$3] = 1;
         }
         else{
-            curr_space->v_list[$3] = int2char(curr_space->v_num + curr_space->stack_start);
+            curr_space->v_list[$3] = int2char(curr_space->v_num);
         }
         curr_space->v_num += 1;
     }
@@ -160,7 +158,7 @@ Declaration:
             curr_space->v_arr_f[$2] = 0;
         }
         else{
-            curr_space->v_list[$2] = int2char(curr_space->v_num + curr_space->stack_start);
+            curr_space->v_list[$2] = int2char(curr_space->v_num);
         }
         curr_space->v_num += 1;
     }
@@ -188,11 +186,7 @@ Statements:
 FunctionHeader:
     FUNC LBRK INT RBRK
     {
-        FuncSpace * new_space;
-        if (curr_space->root)
-            new_space = new FuncSpace(0, 0, curr_space);
-        else
-            new_space = new FuncSpace(0, curr_space->stack_start + curr_space->v_num, curr_space);
+        FuncSpace * new_space = new FuncSpace(0, curr_space);
         curr_space = new_space;
         curr_space->init1 = $1;
         curr_space->init2 = $3;
