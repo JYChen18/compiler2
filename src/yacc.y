@@ -30,7 +30,7 @@ struct FuncSpace{
     char* init2;            /* param num */
     bool init_flag;         /* need to init after 'var...'! */
     map <string, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
-
+    map <string, int> v_arr_f;   /* Eeyore_name -> 1 if is array else 0 */
     FuncSpace (bool _root, int _start, FuncSpace* _p){
         root = _root;
         if (root) 
@@ -87,19 +87,29 @@ char* find_symbol(char* symbol){
     return NULL;
 }
 
+int symbol_is_arr(char* symbol){
+    string s = symbol; 
+    if (global_space->v_list.find(s) != global_space->v_list.end())
+        return global_space->v_arr_f[s];
+    return 0;
+}
+
 void Symbol2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
     if (s[0] == 'a')
-        fprintf(yyout, "t%d = %s\n", num, s);
+        printf("Wrong!!!");
+        /* fprintf(yyout, "t%d = %s\n", num, s); */
     else
         fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
 
 void RightV2Reg(RightV* v, int num){
-    if (v->kind == 0 and v->str[0] != 'a')
-        fprintf(yyout, "load %s t%d\n", v->str, num);
-    else
+    if (v->kind == 1 or v->str[0] == 'a')
         fprintf(yyout, "t%d = %s\n", num, v->str);
+    else if (v->arr_f == 1)
+        fprintf(yyout, "loadaddr %s t%d\n", v->str, num);
+    else
+        fprintf(yyout, "load %s t%d\n", v->str, num);
 }
 
 void FuncInit(){
@@ -135,6 +145,7 @@ Declaration:
         if (curr_space->root){
             fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2);
             curr_space->v_list[$3] = Vint2char(curr_space->v_num);
+            curr_space->v_arr_f[$3] = 1;
         }
         else{
             curr_space->v_list[$3] = int2char(curr_space->v_num + curr_space->stack_start);
@@ -146,6 +157,7 @@ Declaration:
         if (curr_space->root){
             fprintf(yyout, "v%d = 0\n", curr_space->v_num);
             curr_space->v_list[$2] = Vint2char(curr_space->v_num);
+            curr_space->v_arr_f[$2] = 0;
         }
         else{
             curr_space->v_list[$2] = int2char(curr_space->v_num + curr_space->stack_start);
@@ -296,7 +308,7 @@ Expression:
     }
 
 RightValue:
-    SYMBOL {$$ = new RightV(find_symbol($1), 0);}
-    | INT  {$$ = new RightV($1, 1);}
+    SYMBOL {$$ = new RightV(find_symbol($1), 0, symbol_is_arr($1));}
+    | INT  {$$ = new RightV($1, 1, 0);}
     ;
 %%

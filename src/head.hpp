@@ -4,9 +4,11 @@
 struct RightV{
     char* str;
     int kind; /* 0:symbol , 1:int */
-    RightV(char* a, int b){
-        str = a;
-        kind = b;
+    int arr_f;
+    RightV(char* _str, int _kind, int _arr_f){
+        str = _str;
+        kind = _kind;
+        arr_f = _arr_f;
     }
 };
 
