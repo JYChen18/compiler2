@@ -21,14 +21,14 @@ int yywrap(){
 int yylex(void);
 
 struct FuncSpace{
-    int v_num = 0;              /* global variable num. local stack size. */
-    bool root;                  /* global or local. local var is all on stack */
+    bool root;                  /* global or local. */
+    int v_num = 0;              /* global: variable num. local: stack size. (I simply put all local var on stack!) */
     int param_num;              /* param num */
     int child_param_num = 0;    /* param num for child function */
     char* func_name;            /* func name */
-    bool init_flag;             /* need to init after 'var...'! */
+    bool init_flag;             /* NOTE: 'func [x] [x]' need to be after 'var...'! */
     FuncSpace* parent;
-    map <string, char*> v_list; /* Eeyore_name -> vi if root==1 else stack_addr/4 */
+    map <string, char*> v_list; /* Eeyore_name -> vi if is global else stack_addr */
     map <string, int> v_arr_f;  /* Eeyore_name -> 1 if is array else 0 */
     FuncSpace (bool _root, FuncSpace* _p){
         root = _root;
@@ -43,7 +43,7 @@ FuncSpace* global_space = new FuncSpace(1, NULL);
 FuncSpace* curr_space = global_space;
 
 struct GlobalInit{
-    char* symbol;
+    char* symbol; 
     char* int1;
     char* int2;
     GlobalInit* Next;
@@ -57,7 +57,7 @@ struct GlobalInit{
         Next = _next;
     }
 };
-GlobalInit* InitHead = NULL;
+GlobalInit* InitHead = NULL; /* NOTE: Initialization for global var should in f_main! */
 
 char* Vint2char(int input){
     char* newchar = new char[4];
@@ -77,47 +77,50 @@ char* Pint2char(int input){
     return newchar;
 }
 
-char* find_symbol(char* symbol){
+char* symbol2name(char* symbol){
     string s = symbol; 
-    if (curr_space->v_list.find(s) != curr_space->v_list.end())     /* must before global! */
+    if (curr_space->v_list.find(s) != curr_space->v_list.end())    
         return curr_space->v_list[s];
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_list[s];
-    printf("Undefined variable: %s\n", symbol);
+    printf("Undefined variable: %s\n", symbol); /* should not reach here */
     return symbol;
 }
 
-int symbol_is_arr(char* symbol){
+int symbol2arr_f(char* symbol){
     string s = symbol; 
-    if (curr_space->v_list.find(s) != curr_space->v_list.end())    /* must before global! */
+    if (curr_space->v_list.find(s) != curr_space->v_list.end())    
         return curr_space->v_arr_f[s];
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_arr_f[s];
+    printf("Undefined variable: %s\n", symbol);  /* should not reach here */
     return 0;
 }
 
+/* All SYMBOL is in the left of '='. Thus only need "loadaddr". Don't need "load". */
 void Symbol_Addr2Reg(char* symbol, int num){
-    char* s = find_symbol(symbol);
+    char* s = symbol2name(symbol);
     fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
 
-
 void RightV2Reg(RightV* v, int num){
     if (v->kind == 1)           
-        fprintf(yyout, "t%d = %s\n", num, v->str);
-    else if (v->arr_f == 1)
-        fprintf(yyout, "loadaddr %s t%d\n", v->str, num);
-    else
-        fprintf(yyout, "load %s t%d\n", v->str, num);
+        fprintf(yyout, "t%d = %s\n", num, v->str);          /* INT */
+    else if (v->arr_f == 1)     
+        fprintf(yyout, "loadaddr %s t%d\n", v->str, num);   /* array */
+    else            
+        fprintf(yyout, "load %s t%d\n", v->str, num);       /* not an array */
 }
 
 void FuncInit(){
+    /* Add initialization for func after all 'var ...'. Or we don't know how large the stack should be. */
     if (curr_space->init_flag == 0){
         fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->v_num);
         for (int i=0; i < curr_space->param_num; i++)
             fprintf(yyout, "store a%d %d\n", i, i);
         curr_space->init_flag = 1;
     }
+    /* Add initialization for global var in f_main. */
     if (strcmp(curr_space->func_name, "f_main")==0){
         while (InitHead != NULL){
             Symbol_Addr2Reg(InitHead->symbol, 0);
@@ -194,6 +197,7 @@ FunctionHeader:
         curr_space = new_space;
         curr_space->func_name = $1;
         curr_space->param_num = atoi($3);
+        /* NOTE: Must put all param to stack! Or the return value of a function will change 'a0'! */
         for (int i=0; i < curr_space->param_num; i++){
             curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num);
             curr_space->v_arr_f[Pint2char(i)] = 0;
@@ -233,21 +237,13 @@ Expression:
         fprintf(yyout, "t2 = %s t1\n", $3);
         fprintf(yyout, "t0[0] = t2\n");
     }
-    | SYMBOL ASSIGN RightValue ENTER
+    | SYMBOL ASSIGN RightValue ENTER  
+    /* ENTER is essential here? Or will conflit with the following one? Not sure. */
     {
         FuncInit();
         Symbol_Addr2Reg($1, 0);
         RightV2Reg($3, 1);
         fprintf(yyout, "t0[0] = t1\n");
-    }
-    | RightValue LBRK RightValue RBRK ASSIGN RightValue ENTER
-    {
-        FuncInit();
-        RightV2Reg($1, 0);
-        RightV2Reg($3, 1);
-        RightV2Reg($6, 2);
-        fprintf(yyout, "t0 = t0 + t1\n");
-        fprintf(yyout, "t0[0] = t2\n");
     }
     | SYMBOL ASSIGN RightValue LBRK RightValue RBRK ENTER
     {
@@ -259,6 +255,17 @@ Expression:
         fprintf(yyout, "t3 = t1[0]\n");
         fprintf(yyout, "t0[0] = t3\n");
 
+    }
+    | RightValue LBRK RightValue RBRK ASSIGN RightValue ENTER  
+    /* NOTE: The first RightValue here can be a var contain the addr of an array! */
+    /* Simply using SYMBOL and Symbol_Addr2Reg will fail! */
+    {
+        FuncInit();
+        RightV2Reg($1, 0);
+        RightV2Reg($3, 1);
+        RightV2Reg($6, 2);
+        fprintf(yyout, "t0 = t0 + t1\n");
+        fprintf(yyout, "t0[0] = t2\n");
     }
     | IF RightValue OP RightValue GOTO LABEL 
     {
@@ -288,7 +295,7 @@ Expression:
     {
         FuncInit();
         fprintf(yyout, "call %s\n", $2);
-        curr_space->child_param_num = 0;
+        curr_space->child_param_num = 0; /* Note: init child_param_num! */
     }
     | SYMBOL ASSIGN CALL FUNC
     {
@@ -296,7 +303,7 @@ Expression:
         fprintf(yyout, "call %s\n", $4);
         Symbol_Addr2Reg($1, 0);
         fprintf(yyout, "t0[0] = a0\n");
-        curr_space->child_param_num = 0;
+        curr_space->child_param_num = 0; /* Note: init child_param_num! */
     }
     | RETURN RightValue
     {
@@ -312,7 +319,7 @@ Expression:
     }
 
 RightValue:
-    SYMBOL {$$ = new RightV(find_symbol($1), 0, symbol_is_arr($1));}
+    SYMBOL {$$ = new RightV(symbol2name($1), 0, symbol2arr_f($1));}
     | INT  {$$ = new RightV($1, 1, 0);}
     ;
 %%
