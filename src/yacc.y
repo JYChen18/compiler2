@@ -100,10 +100,7 @@ void Symbol_Addr2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
     fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
-void Symbol_Val2Reg(char* symbol, int num){
-    char* s = find_symbol(symbol);
-    fprintf(yyout, "load %s t%d\n", s, num);
-}
+
 
 void RightV2Reg(RightV* v, int num){
     if (v->kind == 1)           
@@ -243,10 +240,10 @@ Expression:
         RightV2Reg($3, 1);
         fprintf(yyout, "t0[0] = t1\n");
     }
-    | SYMBOL LBRK RightValue RBRK ASSIGN RightValue ENTER
+    | RightValue LBRK RightValue RBRK ASSIGN RightValue ENTER
     {
         FuncInit();
-        Symbol_Val2Reg($1, 0);
+        RightV2Reg($1, 0);
         RightV2Reg($3, 1);
         RightV2Reg($6, 2);
         fprintf(yyout, "t0 = t0 + t1\n");
