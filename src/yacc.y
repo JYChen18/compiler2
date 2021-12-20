@@ -39,7 +39,7 @@ struct FuncSpace{
         parent = _p;
     }
 };
-FuncSpace* global_space = new FuncSpace(1, 0, NULL);
+FuncSpace* global_space = new FuncSpace(1, NULL);
 FuncSpace* curr_space = global_space;
 
 struct GlobalInit{
