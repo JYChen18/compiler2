@@ -65,6 +65,12 @@ char* Vint2char(int input){
     return newchar;
 }
 
+char* int2char(int input){
+    char* newchar = new char[8];
+    sprintf(newchar,"%d",input);
+    return newchar;
+}
+
 char* Pint2char(int input){
     char* newchar = new char[4];
     sprintf(newchar,"p%d",input);
@@ -111,7 +117,7 @@ void FuncInit(){
     if (curr_space->init_flag == 0){
         for (i=0; i < curr_space->param_num; i++){
             fprintf(yyout, "store a%d %d\n", i, curr_space->v_num);
-            curr_space->v_list[Pint2char(i)] = strdup(curr_space->v_num);
+            curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num);
             curr_space->v_num += 1;
         }
         fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->v_num);
@@ -148,9 +154,8 @@ Declaration:
             curr_space->v_num += 1;
         }
         else{
-            curr_space->v_list[$3] = strdup(curr_space->v_num);
+            curr_space->v_list[$3] = int2char(curr_space->v_num);
             curr_space->v_num += atoi($2)//4;
-
         }
         curr_space->v_arr_f[$3] = 1;
     }
@@ -161,7 +166,7 @@ Declaration:
             curr_space->v_list[$2] = Vint2char(curr_space->v_num);
         }
         else{
-            curr_space->v_list[$2] = strdup(curr_space->v_num);
+            curr_space->v_list[$2] = int2char(curr_space->v_num);
         }
         curr_space->v_arr_f[$2] = 0;
         curr_space->v_num += 1;
