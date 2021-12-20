@@ -115,9 +115,9 @@ void RightV2Reg(RightV* v, int num){
 
 void FuncInit(){
     if (curr_space->init_flag == 0){
-        fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->param_num+curr_space->v_num);
+        fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->v_num);
         for (int i=0; i < curr_space->param_num; i++)
-            fprintf(yyout, "store a%d %d\n", i, curr_space->v_num + i);
+            fprintf(yyout, "store a%d %d\n", i, i);
         curr_space->init_flag = 1;
     }
     if (strcmp(curr_space->func_name, "f_main")==0){
@@ -197,8 +197,9 @@ FunctionHeader:
         curr_space->func_name = $1;
         curr_space->param_num = atoi($3);
         for (int i=0; i < curr_space->param_num; i++){
-            curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num + i);
+            curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num);
             curr_space->v_arr_f[Pint2char(i)] = 0;
+            curr_space->v_num += 1;
         }
     }
     ;
