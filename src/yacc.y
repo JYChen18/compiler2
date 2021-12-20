@@ -98,10 +98,11 @@ int symbol_is_arr(char* symbol){
 
 void Symbol_Addr2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
-    if (s[0] == 'p')
-        printf("Wrong!!!");
-    else
-        fprintf(yyout, "loadaddr %s t%d\n", s, num);
+    fprintf(yyout, "loadaddr %s t%d\n", s, num);
+}
+void Symbol_Val2Reg(char* symbol, int num){
+    char* s = find_symbol(symbol);
+    fprintf(yyout, "load %s t%d\n", s, num);
 }
 
 void RightV2Reg(RightV* v, int num){
@@ -245,7 +246,7 @@ Expression:
     | SYMBOL LBRK RightValue RBRK ASSIGN RightValue ENTER
     {
         FuncInit();
-        Symbol_Addr2Reg($1, 0);
+        Symbol_Val2Reg($1, 0);
         RightV2Reg($3, 1);
         RightV2Reg($6, 2);
         fprintf(yyout, "t0 = t0 + t1\n");
