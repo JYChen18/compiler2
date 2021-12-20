@@ -208,7 +208,6 @@ FunctionEnd:
     END FUNC
     {
         curr_space = curr_space->parent;
-        curr_space->child_param_num = 0;
         fprintf(yyout, "end %s\n", $2);
     }
     ;
@@ -291,6 +290,7 @@ Expression:
     {
         FuncInit();
         fprintf(yyout, "call %s\n", $2);
+        curr_space->child_param_num = 0;
     }
     | SYMBOL ASSIGN CALL FUNC
     {
@@ -298,6 +298,7 @@ Expression:
         fprintf(yyout, "call %s\n", $4);
         Symbol_Addr2Reg($1, 0);
         fprintf(yyout, "t0[0] = a0\n");
+        curr_space->child_param_num = 0;
     }
     | RETURN RightValue
     {
