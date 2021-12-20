@@ -84,7 +84,7 @@ char* find_symbol(char* symbol){
     if (curr_space->v_list.find(s) != curr_space->v_list.end())
         return curr_space->v_list[s];
     printf("Undefined variable!\n");
-    return NULL;
+    return symbol;
 }
 
 int symbol_is_arr(char* symbol){
@@ -94,7 +94,7 @@ int symbol_is_arr(char* symbol){
     return 0;
 }
 
-void Symbol2Reg(char* symbol, int num){
+void Symbol_Addr2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
     if (s[0] == 'a')
         printf("Wrong!!!");
@@ -104,7 +104,7 @@ void Symbol2Reg(char* symbol, int num){
 }
 
 void RightV2Reg(RightV* v, int num){
-    if (v->kind == 1 or v->str[0] == 'a')
+    if (v->kind == 1 or v->str[0] == 'a')           
         fprintf(yyout, "t%d = %s\n", num, v->str);
     else if (v->arr_f == 1)
         fprintf(yyout, "loadaddr %s t%d\n", v->str, num);
@@ -119,7 +119,7 @@ void FuncInit(){
     }
     if (strcmp(curr_space->init1, "f_main")==0){
         while (InitHead != NULL){
-            Symbol2Reg(InitHead->symbol, 0);
+            Symbol_Addr2Reg(InitHead->symbol, 0);
             fprintf(yyout, "t1 = %s\n", InitHead->int2);
             fprintf(yyout, "t0[%s] = t1\n", InitHead->int1);
             InitHead = InitHead->Next;
@@ -214,51 +214,51 @@ Statement:
     ;
 
 Expression:
-    SYMBOL ASSIGN RightValue OP RightValue
+    SYMBOL ASSIGN RightValue OP RightValue ENTER
     {
         FuncInit();
-        Symbol2Reg($1, 0);
+        Symbol_Addr2Reg($1, 0);
         RightV2Reg($3, 1);
         RightV2Reg($5, 2);
         fprintf(yyout, "t3 = t1 %s t2\n", $4);
         fprintf(yyout, "t0[0] = t3\n");
     }
-    | SYMBOL ASSIGN OP RightValue
+    | SYMBOL ASSIGN OP RightValue ENTER
     {
         FuncInit();
-        Symbol2Reg($1, 0);
+        Symbol_Addr2Reg($1, 0);
         RightV2Reg($4, 1);
         fprintf(yyout, "t2 = %s t1\n", $3);
         fprintf(yyout, "t0[0] = t2\n");
     }
-    | SYMBOL ASSIGN RightValue
+    | SYMBOL ASSIGN RightValue ENTER
     {
         FuncInit();
-        Symbol2Reg($1, 0);
+        Symbol_Addr2Reg($1, 0);
         RightV2Reg($3, 1);
         fprintf(yyout, "t0[0] = t1\n");
     }
-    | SYMBOL LBRK RightValue RBRK ASSIGN RightValue
+    | SYMBOL LBRK RightValue RBRK ASSIGN RightValue ENTER
     {
         FuncInit();
-        Symbol2Reg($1, 0);
+        Symbol_Addr2Reg($1, 0);
         RightV2Reg($3, 1);
         RightV2Reg($6, 2);
         fprintf(yyout, "t0 = t0 + t1\n");
         fprintf(yyout, "t0[0] = t2\n");
     }
-    | SYMBOL ASSIGN SYMBOL LBRK RightValue RBRK
+    | SYMBOL ASSIGN RightValue LBRK RightValue RBRK ENTER
     {
         FuncInit();
-        Symbol2Reg($1, 0);
-        Symbol2Reg($3, 1);
+        Symbol_Addr2Reg($1, 0);
+        RightV2Reg($3, 1);
         RightV2Reg($5, 2);
         fprintf(yyout, "t1 = t1 + t2\n");
         fprintf(yyout, "t3 = t1[0]\n");
         fprintf(yyout, "t0[0] = t3\n");
 
     }
-    | IF RightValue OP RightValue GOTO LABEL
+    | IF RightValue OP RightValue GOTO LABEL 
     {
         FuncInit();
         RightV2Reg($2, 0);
@@ -301,7 +301,7 @@ Expression:
         fprintf(yyout, "a0 = t0\n");
         fprintf(yyout, "return\n");
     }
-    | RETURN
+    | RETURN ENTER
     {
         FuncInit();
         fprintf(yyout, "return\n");
