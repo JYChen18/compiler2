@@ -44,7 +44,7 @@ struct FuncSpace{
 FuncSpace* global_space = new FuncSpace(1, 0, NULL);
 FuncSpace* curr_space = global_space;
 
-Struct GlobalInit{
+struct GlobalInit{
     char* symbol;
     char* int1;
     char* int2;
