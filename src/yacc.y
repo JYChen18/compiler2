@@ -22,25 +22,44 @@ int yylex(void);
 
 struct FuncSpace{
     int v_num = 0;          /* variable num */
-    int param_num = 0;      /* param num */
+    int param_num = 0;      /* param num for next function */
     int stack_start;        /* stack starting address/4 */
-    bool root;              /* global var is on heap?, local var is on stack */
+    bool root;              /* global or local. local var is all on stack */
     FuncSpace* parent;
-    char* init1;
-    char* init2;
-    bool init_flag;
+    char* init1;            /* func name */
+    char* init2;            /* param num */
+    bool init_flag;         /* need to init after 'var...'! */
     map <string, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
 
     FuncSpace (bool _root, int _start, FuncSpace* _p){
         root = _root;
-        if (root) init_flag = 1; 
-        else init_flag = 0;
+        if (root) 
+            init_flag = 1; 
+        else 
+            init_flag = 0;
         stack_start = _start;
         parent = _p;
     }
 };
 FuncSpace* global_space = new FuncSpace(1, 0, NULL);
 FuncSpace* curr_space = global_space;
+
+Struct GlobalInit{
+    char* symbol;
+    char* int1;
+    char* int2;
+    GlobalInit* Next;
+    FuncSpace (char* _symbol, char* _int1, char* _int2, GlobalInit* _next){
+        symbol = _symbol;
+        if (_int1 == NULL) 
+            int1 = strdup("0");
+        else 
+            int1 = _int1;
+        int2 = _int2;
+        Next = _next;
+    }
+};
+GlobalInit* InitHead = NULL;
 
 char* int2char(int input){
     /* change int to char* */
@@ -88,6 +107,13 @@ void FuncInit(){
         fprintf(yyout, "%s [%s] [%d]\n", curr_space->init1, curr_space->init2, curr_space->v_num);
         curr_space->init_flag = 1;
     }
+    if (strcmp(curr_space->init1, "f_main")==0){
+        while (InitHead != NULL){
+            Symbol2Reg(InitHead->symbol, 0);
+            fprintf(yyout, "t0[%s] = %s\n", InitHead->int1, InitHead->int2);
+            InitHead = InitHead->Next;
+        }
+    }
 }
 
 %}
@@ -128,14 +154,12 @@ Declaration:
     ;
 Initialization:
     SYMBOL ASSIGN INT{
-        Symbol2Reg($1, 0);
-        fprintf(yyout, "t0[0] = %s\n", $3);
+        GlobalInit* elem = new GlobalInit($1, NULL, $3, InitHead);
+        InitHead = elem;
     }
     | SYMBOL LBRK INT RBRK ASSIGN INT{
-        Symbol2Reg($1, 0);
-        fprintf(yyout, "t1 = %s\n", $3);
-        fprintf(yyout, "t0 = t0 + t1\n");
-        fprintf(yyout, "t0[0] = %s\n", $6);
+        GlobalInit* elem = new GlobalInit($1, $3, $6, InitHead);
+        InitHead = elem;
     }
 
 FunctionDef:
@@ -166,7 +190,8 @@ FunctionEnd:
     END FUNC
     {
         curr_space = curr_space->parent;
-            fprintf(yyout, "end %s\n", $2);
+        curr_space->param_num = 0;
+        fprintf(yyout, "end %s\n", $2);
     }
     ;
 
