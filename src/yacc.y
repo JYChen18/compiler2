@@ -115,7 +115,7 @@ void RightV2Reg(RightV* v, int num){
 
 void FuncInit(){
     if (curr_space->init_flag == 0){
-        for (i=0; i < curr_space->param_num; i++){
+        for (int i=0; i < curr_space->param_num; i++){
             fprintf(yyout, "store a%d %d\n", i, curr_space->v_num);
             curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num);
             curr_space->v_num += 1;
@@ -155,7 +155,7 @@ Declaration:
         }
         else{
             curr_space->v_list[$3] = int2char(curr_space->v_num);
-            curr_space->v_num += atoi($2)//4;
+            curr_space->v_num += atoi($2) / 4;
         }
         curr_space->v_arr_f[$3] = 1;
     }

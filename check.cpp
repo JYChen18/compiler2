@@ -6,9 +6,6 @@
 using std:: map;
 int main(){
     int x = 10;
-    char* y = strdup("T0");
-    if (y[0] == 'T'){
-        y[0] = 'a';
-    }
-    printf("%s\n", y);
+    int y = atoi("100");
+    printf("%d\n", y/4);
 }
