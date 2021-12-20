@@ -110,7 +110,8 @@ void FuncInit(){
     if (strcmp(curr_space->init1, "f_main")==0){
         while (InitHead != NULL){
             Symbol2Reg(InitHead->symbol, 0);
-            fprintf(yyout, "t0[%s] = %s\n", InitHead->int1, InitHead->int2);
+            fprintf(yyout, "t1 = %s\n", InitHead->int2);
+            fprintf(yyout, "t0[%s] = t1\n", InitHead->int1);
             InitHead = InitHead->Next;
         }
     }
