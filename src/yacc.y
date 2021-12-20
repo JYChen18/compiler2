@@ -49,7 +49,7 @@ struct GlobalInit{
     char* int1;
     char* int2;
     GlobalInit* Next;
-    FuncSpace (char* _symbol, char* _int1, char* _int2, GlobalInit* _next){
+    GlobalInit (char* _symbol, char* _int1, char* _int2, GlobalInit* _next){
         symbol = _symbol;
         if (_int1 == NULL) 
             int1 = strdup("0");
