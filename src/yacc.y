@@ -21,15 +21,15 @@ int yywrap(){
 int yylex(void);
 
 struct FuncSpace{
-    int v_num = 0;          /* variable num */
-    int param_num = 0;      /* param num for next function */
-    bool root;              /* global or local. local var is all on stack */
+    int v_num = 0;              /* global variable num. local stack size. */
+    bool root;                  /* global or local. local var is all on stack */
+    int param_num;              /* param num */
+    int child_param_num = 0;    /* param num for child function */
+    char* func_name;            /* func name */
+    bool init_flag;             /* need to init after 'var...'! */
     FuncSpace* parent;
-    char* init1;            /* func name */
-    char* init2;            /* param num */
-    bool init_flag;         /* need to init after 'var...'! */
-    map <string, char*> v_list;  /* Eeyore_name -> vi if root==1 else stack_addr/4 */
-    map <string, int> v_arr_f;   /* Eeyore_name -> 1 if is array else 0 */
+    map <string, char*> v_list; /* Eeyore_name -> vi if root==1 else stack_addr/4 */
+    map <string, int> v_arr_f;  /* Eeyore_name -> 1 if is array else 0 */
     FuncSpace (bool _root, FuncSpace* _p){
         root = _root;
         if (root) 
@@ -59,34 +59,32 @@ struct GlobalInit{
 };
 GlobalInit* InitHead = NULL;
 
-char* int2char(int input){
-    /* change int to char* */
-    char* newchar = new char[10];
-    sprintf(newchar,"%d",input);
-    return newchar;
-}
 char* Vint2char(int input){
-    char* newchar = new char[10];
+    char* newchar = new char[4];
     sprintf(newchar,"v%d",input);
     return newchar;
 }
 
+char* Pint2char(int input){
+    char* newchar = new char[4];
+    sprintf(newchar,"p%d",input);
+    return newchar;
+}
+
 char* find_symbol(char* symbol){
-    if (symbol[0] == 'p'){
-        symbol[0] = 'a';
-        return symbol;
-    }
     string s = symbol; 
+    if (curr_space->v_list.find(s) != curr_space->v_list.end())     /* must before global! */
+        return curr_space->v_list[s];
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_list[s];
-    if (curr_space->v_list.find(s) != curr_space->v_list.end())
-        return curr_space->v_list[s];
     printf("Undefined variable!\n");
     return symbol;
 }
 
 int symbol_is_arr(char* symbol){
     string s = symbol; 
+    if (curr_space->v_list.find(s) != curr_space->v_list.end())    /* must before global! */
+        return curr_space->v_arr_f[s];
     if (global_space->v_list.find(s) != global_space->v_list.end())
         return global_space->v_arr_f[s];
     return 0;
@@ -94,15 +92,14 @@ int symbol_is_arr(char* symbol){
 
 void Symbol_Addr2Reg(char* symbol, int num){
     char* s = find_symbol(symbol);
-    if (s[0] == 'a')
+    if (s[0] == 'p')
         printf("Wrong!!!");
-        /* fprintf(yyout, "t%d = %s\n", num, s); */
     else
         fprintf(yyout, "loadaddr %s t%d\n", s, num);
 }
 
 void RightV2Reg(RightV* v, int num){
-    if (v->kind == 1 or v->str[0] == 'a')           
+    if (v->kind == 1)           
         fprintf(yyout, "t%d = %s\n", num, v->str);
     else if (v->arr_f == 1)
         fprintf(yyout, "loadaddr %s t%d\n", v->str, num);
@@ -112,10 +109,15 @@ void RightV2Reg(RightV* v, int num){
 
 void FuncInit(){
     if (curr_space->init_flag == 0){
-        fprintf(yyout, "%s [%s] [%d]\n", curr_space->init1, curr_space->init2, curr_space->v_num);
+        for (i=0; i < curr_space->param_num; i++){
+            fprintf(yyout, "store a%d %d\n", i, curr_space->v_num);
+            curr_space->v_list[Pint2char(i)] = strdup(curr_space->v_num);
+            curr_space->v_num += 1;
+        }
+        fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->v_num);
         curr_space->init_flag = 1;
     }
-    if (strcmp(curr_space->init1, "f_main")==0){
+    if (strcmp(curr_space->func_name, "f_main")==0){
         while (InitHead != NULL){
             Symbol_Addr2Reg(InitHead->symbol, 0);
             fprintf(yyout, "t1 = %s\n", InitHead->int2);
@@ -143,23 +145,25 @@ Declaration:
         if (curr_space->root){
             fprintf(yyout, "v%d = malloc %s\n", curr_space->v_num, $2);
             curr_space->v_list[$3] = Vint2char(curr_space->v_num);
-            curr_space->v_arr_f[$3] = 1;
+            curr_space->v_num += 1;
         }
         else{
-            curr_space->v_list[$3] = int2char(curr_space->v_num);
+            curr_space->v_list[$3] = strdup(curr_space->v_num);
+            curr_space->v_num += atoi($2)//4;
+
         }
-        curr_space->v_num += 1;
+        curr_space->v_arr_f[$3] = 1;
     }
     | VAR SYMBOL
     {
         if (curr_space->root){
             fprintf(yyout, "v%d = 0\n", curr_space->v_num);
             curr_space->v_list[$2] = Vint2char(curr_space->v_num);
-            curr_space->v_arr_f[$2] = 0;
         }
         else{
-            curr_space->v_list[$2] = int2char(curr_space->v_num);
+            curr_space->v_list[$2] = strdup(curr_space->v_num);
         }
+        curr_space->v_arr_f[$2] = 0;
         curr_space->v_num += 1;
     }
     ;
@@ -188,8 +192,8 @@ FunctionHeader:
     {
         FuncSpace * new_space = new FuncSpace(0, curr_space);
         curr_space = new_space;
-        curr_space->init1 = $1;
-        curr_space->init2 = $3;
+        curr_space->func_name = $1;
+        curr_space->param_num = atoi($3);
     }
     ;
 
@@ -197,7 +201,7 @@ FunctionEnd:
     END FUNC
     {
         curr_space = curr_space->parent;
-        curr_space->param_num = 0;
+        curr_space->child_param_num = 0;
         fprintf(yyout, "end %s\n", $2);
     }
     ;
@@ -273,8 +277,8 @@ Expression:
     {
         FuncInit();
         RightV2Reg($2, 0);
-        fprintf(yyout, "a%d = t0\n", curr_space->param_num);
-        curr_space->param_num += 1;
+        fprintf(yyout, "a%d = t0\n", curr_space->child_param_num);
+        curr_space->child_param_num += 1;
     }
     | CALL FUNC
     {
