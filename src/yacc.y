@@ -118,7 +118,9 @@ void FuncInit(){
         fprintf(yyout, "%s [%d] [%d]\n", curr_space->func_name, curr_space->param_num, curr_space->param_num+curr_space->v_num);
         for (int i=0; i < curr_space->param_num; i++){
             fprintf(yyout, "store a%d %d\n", i, curr_space->v_num);
+            printf("%s\n", Pint2char(i));
             curr_space->v_list[Pint2char(i)] = int2char(curr_space->v_num);
+            curr_space->v_arr_f[Pint2char(i)] = 0;
             curr_space->v_num += 1;
         }
         curr_space->init_flag = 1;
